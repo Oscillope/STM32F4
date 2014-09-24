@@ -3,45 +3,86 @@
  */
 
 #include "stm32f4xx_conf.h"
+#include "display.h"
+#define ALL_ONES_L	0x000000FFFFFFFFFF
+#define ALL_ONES_H	0x000000FFFFFFFFFF
+#define ROW_MASK	0x0000000000000FFF
 int count;
-long long i;
-int shift = 0x001F;
-int row = 0x0006;
+int row;
+long long shift_h = ALL_ONES_H;
+long long shift_l = ALL_ONES_L;
+const short rows[] = {ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7};
 
-int get_shift(int test) {
-	return test >> 4;
-}
-
-int set_shift(int set, int row) {
-	return (set << 4) & row;
-}
-
+#ifdef OLD_ROW
 void TIM2_IRQHandler(void) {
 	if (TIM2->SR & TIM_SR_UIF) {
-		if (!count) {
-			if (shift & 0x01) {
-				GPIOD->ODR |= GPIO_ODR_ODR_13;
-			} else {
-				GPIOD->ODR &= ~GPIO_ODR_ODR_13;
-			}
+		int i, j;
+		//while (!(GPIOE->IDR & GPIO_IDR_IDR_8));
+		GPIOD->ODR ^= GPIO_ODR_ODR_15;
+		if (shift & 0x01) {
+			GPIOD->ODR |= GPIO_ODR_ODR_13;
+		} else {
+			GPIOD->ODR &= ~GPIO_ODR_ODR_13;
+		}
+		if ((count & 0x01)) {
 			shift >>= 1;
 		}
-		if (!shift) {
-			RCC->APB1ENR &= ~RCC_APB1ENR_TIM2EN;
-			RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
-			TIM3->PSC = TIM_PSC_PSC;		// No prescaler
-			TIM3->DIER |= TIM_DIER_UIE;	// Update interrupt enable
-			TIM3->ARR = 0x08;		// Count to 0x80, autoreload
-			TIM3->CR1 |= TIM_CR1_ARPE |	// Autoreload on
-				     TIM_CR1_CEN;	// Counter enable
-			TIM3->EGR = TIM_EGR_UG;
-			//GPIOD->ODR &= ~GPIO_ODR_ODR_11;
+		if (row == 7) {
+			row = 0;
 		}
-		GPIOD->ODR ^= GPIO_ODR_ODR_15;
-		count ^= 0x01;
+		if (count == 0x11) {
+			GPIOD->ODR &= ~GPIO_ODR_ODR_15;
+			shift = 0x001f | (rows[row++] << 5);
+			count = 0;
+			for(i = 0; i < 65535; i++) {
+				for(j = 0; j < 65; j++)
+					GPIOD->ODR ^= GPIO_ODR_ODR_14;
+			}
+		} else {
+			count++;
+		}
 	}
 	TIM2->SR = 0x00;
 }
+#else
+void TIM2_IRQHandler(void) {
+	if (TIM2->SR & TIM_SR_UIF) {
+		int i, j;
+		GPIOD->ODR ^= GPIO_ODR_ODR_15;
+		if (shift_l & 0x01) {
+			GPIOD->ODR |= GPIO_ODR_ODR_13;
+		} else {
+			GPIOD->ODR &= ~GPIO_ODR_ODR_13;
+		}
+		if (count & 0x01) {
+			shift_l >>= 1;
+		}
+		if (row == 7) {
+			row = 0;
+		}
+		if (count == 80) {
+			shift_l = (long long)rows[row++] & ROW_MASK;
+		}
+		if (!shift_l && shift_h) {
+			shift_l = shift_h;
+			shift_h = 0;
+			count++;
+		} else if (count == 88) {
+			shift_l = ALL_ONES_L;
+			shift_h = ALL_ONES_H;
+			GPIOD->ODR &= ~GPIO_ODR_ODR_15;
+			for(i = 0; i < 65535; i++) {
+				for(j = 0; j < 655; j++)
+					GPIOD->ODR ^= GPIO_ODR_ODR_14;
+			}
+			count = 0;
+		} else {
+			count++;
+		}
+	}
+	TIM2->SR = 0x00;
+}
+#endif
 
 void TIM3_IRQHandler(void) {
 	if (TIM3->SR & TIM_SR_UIF)
@@ -52,7 +93,7 @@ void TIM3_IRQHandler(void) {
 int main(void)
 {
 	count = 0;
-	shift = 0x1f | (row << 5);
+	row = 0;
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
 	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 	GPIOD->MODER = GPIO_MODER_MODER11_0 |
@@ -60,21 +101,40 @@ int main(void)
 		       GPIO_MODER_MODER13_0 |	/* Orange LED, PD13 output */
 		       GPIO_MODER_MODER14_0 |	/* Red LED, PD14 output */
 		       GPIO_MODER_MODER15_0;	/* Blue LED, PD15 output */
+	GPIOE->MODER = GPIO_MODER_MODER7_0;
 
-	GPIOD->ODR |= GPIO_ODR_ODR_11;
+	GPIOE->ODR |= GPIO_ODR_ODR_7;
+
+	GPIOE->PUPDR |= GPIO_PUPDR_PUPDR8_1;
+
+	GPIOD->ODR &= ~GPIO_ODR_ODR_11;
 	GPIOD->ODR ^= GPIO_ODR_ODR_12;
+	GPIOD->ODR &= ~GPIO_ODR_ODR_13;
 	GPIOD->ODR ^= GPIO_ODR_ODR_14;
-	GPIOD->ODR |= GPIO_ODR_ODR_15;
+	GPIOD->ODR &= ~GPIO_ODR_ODR_15;
+	GPIOD->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR11;
+	GPIOD->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR12;
+	GPIOD->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR13;
+	GPIOD->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR14;
+	GPIOD->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR15;
 
 	NVIC->ISER[0] |= 1 << (TIM2_IRQn);
 	NVIC->ISER[0] |= 1 << (TIM3_IRQn);
 
 	TIM2->PSC = TIM_PSC_PSC;		// No prescaler
 	TIM2->DIER |= TIM_DIER_UIE;	// Update interrupt enable
-	TIM2->ARR = 0x80;		// Count to 0x80, autoreload
+	TIM2->ARR = 0x81;		// Count to 0x80, autoreload
 	TIM2->CR1 |= TIM_CR1_ARPE |	// Autoreload on
 		     TIM_CR1_CEN;	// Counter enable
 	TIM2->EGR = TIM_EGR_UG;
+
+	//RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+	TIM3->PSC = TIM_PSC_PSC;		// No prescaler
+	TIM3->DIER |= TIM_DIER_UIE;	// Update interrupt enable
+	TIM3->ARR = 0x10;		// Count to 0x80, autoreload
+	TIM3->CR1 |= TIM_CR1_ARPE |	// Autoreload on
+		     TIM_CR1_CEN;	// Counter enable
+	TIM3->EGR = TIM_EGR_UG;
 
 	while(1) {
 	}
