@@ -9,32 +9,33 @@
 #define ROW6		0x0003
 #define ROW7		0x0007
 
-const short rows[] = {ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7};
+short rows[] = {ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7};
+
+const char A[8] = {
+	[0]	= 0x00,	// 00000
+	[ROW1]	= 0x04,	// 00100
+	[ROW2]	= 0x0a,	// 01010
+	[ROW3]	= 0x11,	// 10001
+	[ROW4]	= 0x1f,	// 11111
+	[ROW5]	= 0x11,	// 10001
+	[ROW6]	= 0x11,	// 10001
+	[ROW7]	= 0x11,	// 10001
+};
 
 struct framebuffer {
-	char			glyph[16][7][5];
+	char			*glyph[16];
 	short			*cur_row;
 	int			idx;
 	struct framebuffer	*next;
 };
 
-struct framebuffer *cur_buf;
-
-const struct framebuffer test_buf = {
-	.glyph		= {A, A, A, A, A, A, A, A, A, A, A, A, A, A, A, A},
+struct framebuffer test_buf = {
+	.glyph		= {[0 ... 15] = A},
 	.cur_row	= &rows[0],
 	.idx		= 0,
-	.next		= &test_buf
+	.next		= &test_buf,
 };
 
-const char A[8][5] = {
-	[ROW1]	= {0, 0, 1, 0, 0},
-	[ROW2]	= {0, 1, 0, 1, 0},
-	[ROW3]	= {1, 1, 0, 1, 1},
-	[ROW4]	= {1, 0, 0, 0, 1},
-	[ROW5]	= {1, 1, 1, 1, 1},
-	[ROW6]	= {1, 0, 0, 0, 1},
-	[ROW7]	= {1, 0, 0, 0, 1}
-};
+struct framebuffer *cur_buf = &test_buf;
 
 #endif /* DISPLAY_H */

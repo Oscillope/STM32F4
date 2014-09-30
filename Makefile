@@ -13,7 +13,7 @@ PROJ_NAME=main
 CC=arm-none-eabi-gcc
 OBJCOPY=arm-none-eabi-objcopy
 
-CFLAGS  = -ggdb -Wall -Tstm32_flash.ld 
+CFLAGS  = --std=c99 -ggdb -Wall -Tstm32_flash.ld
 CFLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
@@ -33,9 +33,13 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-.PHONY: lib proj
+.PHONY: lib proj flash
 
-all: lib proj
+all: lib proj flash
+noflash: lib proj
+
+flash: $(PROJ_NAME).elf
+	st-flash write $(PROJ_NAME).bin 0x8000000
 
 lib:
 	$(MAKE) -C lib

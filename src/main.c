@@ -15,9 +15,9 @@ long long shift_l = ALL_ONES_L;
 void TIM2_IRQHandler(void) {
 	if (TIM2->SR & TIM_SR_UIF) {
 		int i, j;
-		short cur_row = (count ? cur_buf->cur_row : cur_buf->cur_row++);
+		short cur_row = (count ? *(cur_buf->cur_row) : *(cur_buf->cur_row++));
 		int idx = cur_buf->idx;
-		char *cur_glyph = cur_buf->glyph[idx >> 4][cur_row][idx % 5];
+		char cur_glyph = cur_buf->glyph[idx / 80][cur_row];
 
 		GPIOD->ODR ^= GPIO_ODR_ODR_15;
 		if (count >= 80) {
@@ -29,7 +29,7 @@ void TIM2_IRQHandler(void) {
 			if (count & 0x01) {
 				cur_row >>= 1;
 			}
-		} else if (cur_glyph & 0x01) {
+		} else if ((cur_glyph >> (idx % 5)) & 0x01) {
 			GPIOD->ODR |= GPIO_ODR_ODR_13;
 		} else {
 			GPIOD->ODR &= ~GPIO_ODR_ODR_13;
@@ -47,6 +47,9 @@ void TIM2_IRQHandler(void) {
 		} else {
 			count++;
 		}
+
+		cur_buf->idx = idx;
+		*cur_buf->cur_row = cur_row;
 	}
 	TIM2->SR = 0x00;
 }
