@@ -11,70 +11,38 @@ int count;
 int row;
 long long shift_h = ALL_ONES_H;
 long long shift_l = ALL_ONES_L;
-const short rows[] = {ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7};
 
-#ifdef OLD_ROW
 void TIM2_IRQHandler(void) {
 	if (TIM2->SR & TIM_SR_UIF) {
 		int i, j;
-		//while (!(GPIOE->IDR & GPIO_IDR_IDR_8));
+		short cur_row = (count ? cur_buf->cur_row : cur_buf->cur_row++);
+		int idx = cur_buf->idx;
+		char *cur_glyph = cur_buf->glyph[idx >> 4][cur_row][idx % 5];
+
 		GPIOD->ODR ^= GPIO_ODR_ODR_15;
-		if (shift & 0x01) {
-			GPIOD->ODR |= GPIO_ODR_ODR_13;
-		} else {
-			GPIOD->ODR &= ~GPIO_ODR_ODR_13;
-		}
-		if ((count & 0x01)) {
-			shift >>= 1;
-		}
-		if (row == 7) {
-			row = 0;
-		}
-		if (count == 0x11) {
-			GPIOD->ODR &= ~GPIO_ODR_ODR_15;
-			shift = 0x001f | (rows[row++] << 5);
-			count = 0;
-			for(i = 0; i < 65535; i++) {
-				for(j = 0; j < 65; j++)
-					GPIOD->ODR ^= GPIO_ODR_ODR_14;
+		if (count >= 80) {
+			if (cur_row & 0x01) {
+				GPIOD->ODR |= GPIO_ODR_ODR_13;
+			} else {
+				GPIOD->ODR &= ~GPIO_ODR_ODR_13;
 			}
-		} else {
-			count++;
-		}
-	}
-	TIM2->SR = 0x00;
-}
-#else
-void TIM2_IRQHandler(void) {
-	if (TIM2->SR & TIM_SR_UIF) {
-		int i, j;
-		GPIOD->ODR ^= GPIO_ODR_ODR_15;
-		if (shift_l & 0x01) {
+			if (count & 0x01) {
+				cur_row >>= 1;
+			}
+		} else if (cur_glyph & 0x01) {
 			GPIOD->ODR |= GPIO_ODR_ODR_13;
 		} else {
 			GPIOD->ODR &= ~GPIO_ODR_ODR_13;
 		}
 		if (count & 0x01) {
-			shift_l >>= 1;
+			idx++;
 		}
-		if (row == 7) {
-			row = 0;
-		}
-		if (count == 80) {
-			shift_l = (long long)rows[row++] & ROW_MASK;
-		}
-		if (!shift_l && shift_h) {
-			shift_l = shift_h;
-			shift_h = 0;
-			count++;
-		} else if (count == 88) {
-			shift_l = ALL_ONES_L;
-			shift_h = ALL_ONES_H;
+		if (count == 88) {
 			GPIOD->ODR &= ~GPIO_ODR_ODR_15;
-			for(i = 0; i < 65535; i++) {
-				for(j = 0; j < 655; j++)
-					GPIOD->ODR ^= GPIO_ODR_ODR_14;
-			}
+			//~ for(i = 0; i < 65535; i++) {
+				//~ for(j = 0; j < 655; j++)
+					//~ GPIOD->ODR ^= GPIO_ODR_ODR_14;
+			//~ }
 			count = 0;
 		} else {
 			count++;
@@ -82,7 +50,6 @@ void TIM2_IRQHandler(void) {
 	}
 	TIM2->SR = 0x00;
 }
-#endif
 
 void TIM3_IRQHandler(void) {
 	if (TIM3->SR & TIM_SR_UIF)
